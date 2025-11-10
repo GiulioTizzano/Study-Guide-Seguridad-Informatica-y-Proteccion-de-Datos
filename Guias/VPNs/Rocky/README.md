@@ -155,14 +155,14 @@ Esto crea el siguiente archivo:
 -------------------------------------------------------------------------
 Archivos Obtenidos Descripción:
 
-pki/issued/servidor.crt	Certificado público del servidor
-pki/private/servidor.key	Clave privada del servidor
-pki/issued/cliente.crt	Certificado público del cliente
-pki/private/cliente.key	Clave privada del cliente
-pki/dh.pem	Parámetros Diffie-Hellman
-pki/ca.crt	Certificado raíz de la CA
-pki/private/ca.key	Clave privada de la CA
-pki/crl.pem   Lista de certificados revocados
+- pki/issued/servidor.crt	Certificado público del servidor
+- pki/private/servidor.key	Clave privada del servidor
+- pki/issued/cliente.crt	Certificado público del cliente
+- pki/private/cliente.key	Clave privada del cliente
+- pki/dh.pem	Parámetros Diffie-Hellman
+- pki/ca.crt	Certificado raíz de la CA
+- pki/private/ca.key	Clave privada de la CA
+- pki/crl.pem   Lista de certificados revocados
 
 -------------------------------------------------------------------------
 
