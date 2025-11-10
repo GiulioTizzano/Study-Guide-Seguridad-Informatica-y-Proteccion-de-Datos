@@ -136,9 +136,21 @@ Clave y certificado del cliente:
 ./easyrsa build-client-full cliente nopass
 ```
 
-Parámetros Diffie-Hellman:
+Parámetros Diffie-Hellmann:
 ```
 ./easyrsa gen-dh
+```
+
+Creamos la lista de certificados recovados:
+
+Generamos la CRL
+```
+./easyrsa gen-crl
+```
+
+Esto crea el siguiente archivo:
+```
+/etc/openvpn/easy-rsa/pki/crl.pem
 ```
 -------------------------------------------------------------------------
 Archivos Obtenidos Descripción:
@@ -150,6 +162,7 @@ pki/private/cliente.key	Clave privada del cliente
 pki/dh.pem	Parámetros Diffie-Hellman
 pki/ca.crt	Certificado raíz de la CA
 pki/private/ca.key	Clave privada de la CA
+pki/crl.pem   Lista de certificados revocados
 
 -------------------------------------------------------------------------
 
@@ -171,6 +184,7 @@ sudo cp /etc/openvpn/easy-rsa/pki/issued/servidor.crt /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/private/servidor.key /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/dh.pem /etc/openvpn/server/
 sudo cp /etc/openvpn/ta.key /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/server/
 
 ```
 
@@ -179,13 +193,106 @@ Comprobación final:
 ls /etc/openvpn/server
 
 Lo que deberia verse:
-ca.crt  dh.pem  servidor.crt  servidor.key  ta.key
+ca.crt  crl.pem  dh.pem  servidor.crt  servidor.key  ta.key 
 ```
 
+**3. Configurar el servidor OpenVPN en modo. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
 
+Creamos el fichero **/etc/openvpn/server/server.conf**:
+```
+sudo vi /etc/openvpn/server/servidor.conf
+```
 
+Configuración dentro del fichero **server.conf**:
+```
 
+# ================================
+# CONFIGURACIÓN DEL SERVIDOR OPENVPN (MODO TUN - UDP)
+# ================================
 
+# Puerto y protocolo de transporte
+port 1194
+proto udp
 
+# Dispositivo virtual de nivel 3 (túnel IP)
+dev tun
 
+# Rutas a los certificados y claves
+ca ./ca.crt
+cert ./servidor.crt
+key ./servidor.key
+dh ./dh.pem
+crl-verify ./crl.pem
+
+# Clave TLS compartida para canal de control (opcional pero recomendada)
+tls-auth ./ta.key 0
+
+# Red virtual que OpenVPN asignará a los clientes
+server 172.16.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+
+# Anunciar a los clientes la red interna detrás del servidor (LAN real)
+push "route 172.22.0.0 255.255.255.0"
+
+# Parámetros de sesión: keepalive (ping/timeout)
+keepalive 10 120
+
+# Cifrado simétrico del túnel
+data-ciphers AES-256-CBC
+
+# Mantener claves y túnel tras reinicios del servicio
+persist-key
+persist-tun
+
+# Nivel de verbosidad del log (4 = detallado)
+verb 4
+```
+
+Luego, tenemos que activar el **FORWARDING** también en el servidor, para ello manipulamos el fichero que se encuentra aquí:
+
+```
+sudo vi /etc/sysctl.conf
+
+y agregar o descomentar la siguiente línea:
+
+net.ipv4.ip_forward = 1
+```
+
+Aplicamos los cambios:
+```
+sudo sysctl -p
+sysctl net.ipv4.ip_forward
+
+Debería verse como resultado:
+net.ipv4.ip_forward = 1
+```
+
+Arrancamos el serivico de OpenVPN en el lado del servidor:
+```
+sudo systemctl start openvpn-server@server
+sudo systemctl enable openvpn-server@server
+```
+
+Comprobación del estado:
+```
+sudo systemctl status openvpn-server@server
+
+Si salta algún error, ejecutar el siguiente comando:
+
+sudo journalctl -u openvpn-server@server (-n 20)
+```
+
+Comprobaciones de funcionamiento:
+
+Ver interfaz TUN creada
+```
+ip addr show
+ip a
+ip a show tun0
+```
+
+Ver rutas activas
+```
+ip route
+```
 
