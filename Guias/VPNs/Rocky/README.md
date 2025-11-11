@@ -296,3 +296,44 @@ Ver rutas activas
 ip route
 ```
 
+**4. Nos piden configurar en el gateway un port-forwarding para que el servidor interno (LAN) sea capaz de recibir el tráfico recibido en el puerto udp/1194 de su interfaz externo (gateway) (es necesaria una regla iptables NAT en PREROUTING).**
+
+Para realizar la configuración del port-forwarding (PREROUTING) debemos primero de conocer cuales son los interfaces asociados al gateway. Para ello, ejecutamos lo siguiente:
+
+```
+ip a
+```
+
+Con esto, deberíamos de ver los interfaces con sus IPs asociadas. Nosotros, vamos a aplicar la regla de PREROUTING al interfaz que dé directamente CONECTIVIDAD hacia el exterior (en mi caso es el eth1 de mi gateway). Por tanto, ejecutamos el siguiente comando para aplicar la regla según lo que pide el enunciado:
+
+```
+sudo iptables -t nat -A PREROUTING -p udp --dport 1194 -i eth1 -j DNAT --to-destination 172.22.0.80:1194
+```
+En este caso la IP **172.22.0.80** es la dirección IP de la interfaz de mi servidor interno.
+
+Tras ejecutar el comando, deberíamos ir al servidor y abrir el programa tcpdump para verificar que lleguen conexiones desde el exterior (PC1). Ejecutamos el siguiente comando dentro del servidor para analizar el tráfico:
+
+```
+sudo tcpdump -i eth0
+```
+
+Y, desde el PC1/cliente1 lanzamos el siguiente comando:
+
+```
+ping 172.22.0.80
+```
+
+Deberíamos poder ver como llegan los datagramas al servidor interno.
+
+También, para comprobar que la regla se haya aplicado correctamente, deberíamos ejecutar lo siguiente desde el GATEWAY:
+
+```
+sudo iptables -t nat -L PREROUTING -n -v
+```
+
+Dentro de la Rocky Linux, las reglas de iptables no se guardan automáticamente y para que sean persistentes tras reiniciar el gateway hace falta ejecutar el siguiente comando (dentro del GATEWAY):
+
+```
+sudo iptables-save > /etc/sysconfig/iptables
+```
+La próxima vez que arranquemos la máquina la regla debería de haberse guardado.
