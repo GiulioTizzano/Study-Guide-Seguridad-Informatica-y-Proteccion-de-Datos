@@ -13,9 +13,9 @@ nmcli con show
 nmcli con mod "Conexión cableada 1" connection.id eth1
 
 
-# eth0 -> Red externa
+# eth0 -> Red interna
 nmcli con mod eth0 ipv4.addresses 172.22.0.10/24 ipv4.method manual
-# eth1 -> Red interna
+# eth1 -> Red externa
 nmcli con mod eth1 ipv4.addresses 40.40.40.10/24 ipv4.method manual
 nmcli con mod eth0 ipv4.gateway ""   # No gateway interno
 nmcli con mod eth1 ipv4.gateway 40.40.40.1
@@ -185,6 +185,8 @@ sudo cp /etc/openvpn/easy-rsa/pki/private/servidor.key /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/dh.pem /etc/openvpn/server/
 sudo cp /etc/openvpn/ta.key /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/server/
+sudo cp pki/issued/cliente.crt /etc/openvpn/server/
+sudo cp pki/private/cliente.key /etc/openvpn/server/
 
 ```
 
@@ -193,7 +195,7 @@ Comprobación final:
 ls /etc/openvpn/server
 
 Lo que deberia verse:
-ca.crt  crl.pem  dh.pem  servidor.crt  servidor.key  ta.key 
+ca.crt  crl.pem  dh.pem  servidor.crt  servidor.key  ta.key cliente.crt cliente.key
 ```
 
 **3. Configurar el servidor OpenVPN en modo. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
@@ -337,3 +339,127 @@ Dentro de la Rocky Linux, las reglas de iptables no se guardan automáticamente 
 sudo iptables-save > /etc/sysconfig/iptables
 ```
 La próxima vez que arranquemos la máquina la regla debería de haberse guardado.
+
+
+**5. Configurar en el Gateway el enmascaramiento para todo el tráfico saliente. También hay que comprobar que se siguen pudiendo alcanzar todos los recursos externos desde la red interna (PC2 a PC1). Verificar que se realiza el enmascaramiento usando tcpdump.**
+
+Ejecutamos el siguiente comando para enmascarar el tráfico (lo ejecutamos en el GATEWAY):
+
+```
+sudo iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
+```
+
+Comprobamos que se haya completado correctamente la regla ejecutando el siguiente comando:
+
+```
+sudo iptables -t nat -L POSTROUTING -n -v
+```
+
+Para guardar la configuración (darle persistencia), debemos de ejecutar los siguientes comandos:
+
+```
+sudo iptables-save > /etc/sysconfig/iptables
+```
+
+Ahora comprobamos la conectividad desde la red interna (también podríamos comprobarlo desde el servidor para confirmar del todo):
+Desde PC2:
+
+```
+ping 40.40.40.30
+```
+
+Luego, para demostrar el enmascaramiento usaremos tcpdump. Para ello, desde el GATEWAY ejecutamos lo siguiente:
+
+```
+sudo tcpdump -i eth1 -n icmp
+```
+
+Luego, desde PC2 lanzamos ping a PC1:
+
+```
+ping 40.40.40.30
+```
+Veremos paquetes ICMP saliendo con IP origen 40.40.40.10 aunque realmente el emisor era otro.
+
+**6. Configurar el cliente OpenVPN en el PC1 (client.conf) para conectar al servidor (a través de la IP del GATEWAY). Para completar esta tarea es necesario copiar los archivos necesarios obtenidos en el apartado 2.**
+
+En el PC1/cliente1 instalamos OpenVPN:
+
+```
+sudo dnf install -y openvpn
+```
+
+Luego, creamos el directorio de configuración del cliente:
+
+```
+sudo mkdir -p /etc/openvpn/client
+cd /etc/openvpn/client
+```
+
+Ahora copiamos los archivos necesarios para el cliente desde el servidor VPN. Eso incluye el ca.crt, cliente.crt, cliente.key y el ta.key:
+
+```
+scp root@172.22.0.80:/etc/openvpn/server/ca.crt .
+scp root@172.22.0.80:/etc/openvpn/easy-rsa/pki/issued/cliente.crt .
+scp root@172.22.0.80:/etc/openvpn/easy-rsa/pki/private/cliente.key .
+scp root@172.22.0.80:/etc/openvpn/server/ta.key .
+```
+
+Tras copiar todos los ficheros correspondientes a nuestra máquina cliente, deberíamos ver lo siguiente:
+
+```
+ca.crt
+cliente.crt
+cliente.key
+ta.key
+```
+
+Ahora creamos el archivo de configuración del cliente **client.conf** y le metemos la siguiente estructura al archivo:
+
+```
+sudo vi /etc/openvpn/client/client.conf
+
+
+# ================================
+# CLIENTE OPENVPN - MODO TUN (UDP)
+# ================================
+
+# Dirección y puerto del servidor VPN:
+client
+dev tun
+proto udp
+
+# IP externa del gateway:
+remote 40.40.40.10 1194
+
+# Certificados y claves:
+ca ./ca.crt
+cert ./cliente.crt
+key ./cliente.key
+
+# Clave TLS compartida (coincide con servidor):
+tls-auth ./ta.key 1 (en mi caso la llave se llama ta-key, ajustar según necesidad)
+
+# Algoritmo de cifrado:
+data-ciphers AES-256-CBC
+
+# Mantener la conexión
+resolv-retry infinite
+persist-key
+persist-tun
+```
+
+Una vez configurado, le damos a iniciar el servicio, habilitamos el servicio para que arranque en cuanto arranque la máquina y comprobamos su estado:
+
+```
+sudo systemctl start openvpn-client@client
+sudo systemctl enable openvpn-client@client
+sudo systemctl status openvpn-client@client
+
+```
+
+
+
+
+
+
