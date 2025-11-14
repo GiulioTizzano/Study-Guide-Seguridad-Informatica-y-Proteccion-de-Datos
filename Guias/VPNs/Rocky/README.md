@@ -458,8 +458,76 @@ sudo systemctl status openvpn-client@client
 
 ```
 
+**7. Iniciar el cliente y comprobar que se conecta al servidor. Verificar la configuración que se establece en el interfaz virtual TUN del cliente, tabla de encaminamiento y que es posible alcanzar desde PC1 los recursos ofrecidos por el servidor a través de la VPN. A su vez, desactivar el router por defecto en PC1 y comprobar que sigue siendo posible acceder al servidor**
+
+Iniciar el cliente OpenVPN:
+```
+sudo systemctl start openvpn-client@client
+sudo systemctl status openvpn-client@client
+```
+
+Comprobar el interfaz virtual tun:
+
+```
+ip a show tun0 (se deberñia ver la configuración punto a punto de las direcciones IP)
+```
+
+Verificamos la tabla de encaminamiento en PC1:
+```
+ip route
+```
+
+Comprobar conectividad hacia los recursos del servidor:
+
+```
+ping 172.16.0.1 (debemos obtener respuesta del PING)
+ping 172.22.0.80 (debemos obtener respuesta del PING)
+```
+
+Verificar que el tráfico se transporta por tun0 y cifrado sobre eth0:
+```
+En el lado servidor:
+sudo tcmdump -i tun0 -n 
+
+En PC1:
+ping 172.22.0.80
+
+En la captura veremos ICMP normales porque tun0 ya contiene el tráfico descifrado
+
+En cambio, cuando miramos al interfaz del gateway (eth0) que conecta a la red interna, veremos que las capturas deben mostrar paquetes UDP cifrados. Dado que, PC1 encapsula su tráfico dentro de OpenVPN, el gateway reenvía el tráfico cifrado y el servidor descifra en tun0:
+
+En el gateway:
+sudo tcpdump -i eth0 udp port 1194 -n
+
+En PC1:
+ping 172.22.0.80
+```
+
+Ahora desactivamos el router por defecto en PC1 y comprobamos el acceso al servidor:
+
+```
+nmcli con mod eth0 ipv4.gateway ""
+nmcli con down eth0
+nmcli con up eth0
+ip route
+```
+
+Ahora probamos el accesso al servidor sin GATEWAY por defecto:
+
+```
+nmcli con mod eth0 ipv4.addresses 40.40.40.30/24 ipv4.method manual
+nmcli con mod eth0 ipv4.gateway ""
+nmcli con up eth0
 
 
+Comprobar que no tiene gateway por defecto el PC1:
+
+nmcli con show eth0 | grep ipv4.gateway
+
+Luego, lanzamos ping al servidor:
+ping 172.22.0.80
 
 
+Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
+```
 
