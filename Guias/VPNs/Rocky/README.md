@@ -531,3 +531,32 @@ ping 172.22.0.80
 Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
 ```
 
+**8. Comprobar si es posible alcanzar el equipo PC2 desde PC2 a través de la conexión VPN.**
+
+Prueba desde PC1 a PC2:
+```
+ping 172.22.0.50 
+
+Lo normal es que no responda, pero no porque PC2 no reciba los paquetes, sino porque PC2 no sabe como volver a PC1 (no conoce como llegar a PC1).
+
+Si analizamos las capturas al hacer ping de PC1 --> PC2, veremos que a PC2 le llegan todos los datagramas:
+
+sudo tcmdump -i eth0 -n
+```
+
+**9. Modificar la configuración de PC2 par que pueda comunicar con PC1 a través de la VPN. (También es posible configurar el gateway para el retorno de los paquetes a través de la VPN, sin modificar el encaminamiento de PC2) .**
+
+Configuración de PC2 para poder comunicar con PC1:
+```
+sudo ip route add 172.16.0.0/24 via 172.22.0.80
+```
+
+O también, es posible configurar la devuelta de los paquetes en el propio Gateway (más cómodo en el caso hipotético de que hubiera más dispositivos en la red y de no querer configurar uno por uno los dispositivos):
+
+```
+sudo ip route add 172.16.0.0/24 via 172.22.0.80
+
+```
+Ambas opciones han de funcionar
+
+FIN PRÁCTICA
