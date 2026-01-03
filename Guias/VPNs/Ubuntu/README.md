@@ -42,7 +42,6 @@ network:
         via: 172.22.0.10/24
       nameservers:
         addresses: [8.8.8.8]
-    
 ```
 Luego, volver a ejecutar el siguiente comando para guardar los cambios:
 ```
@@ -123,3 +122,69 @@ curl http://localhost
 ```
 
 **2. Crear una Autoridad de Certificación en el servidor y emitir los elementos necesarios para la configuración (valores DH, claves/certificados para el servidor y el cliente.**
+
+Para poder realizar este apartado bien, vamos a instalar las herramientas correspondientes necesarias (ejecutar en el servidor):
+
+```
+Instalar OpenVPN y EasyRSA:
+sudo apt install -y openvpn easy-rsa
+```
+
+Ahora, preparamos el directorio Easy-RSA:
+
+```
+sudo mkdir -p /etc/openvpn/easy-rsa
+sudo cp -r /usr/share/easy-rsa/* /etc/openvpn/easy-rsa/
+sudo chown -R $USER:$USER /etc/openvpn/easy-rsa
+cd /etc/openvpn/easy-rsa
+```
+
+Inicializar PKI y crear CA:
+
+```
+./easyrsa init-pki
+./easyrsa build-ca
+```
+
+Ahora procedemos a crear el servidor, cliente, DH y CRL:
+```
+./easyrsa build-server-full servidor nopass
+./easyrsa build-client-full cliente nopass
+./easyrsa gen-dh
+./easyrsa gen-crl
+```
+
+Clave TLS compartida (ta.key):
+```
+sudo openvpn --genkey --secret /etc/openvpn/ta.key
+```
+
+Organizar ficheros en /etc/openvpn/server
+```
+sudo mkdir -p /etc/openvpn/server
+
+sudo cp /etc/openvpn/easy-rsa/pki/ca.crt /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/issued/servidor.crt /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/private/servidor.key /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/dh.pem /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/server/
+sudo cp /etc/openvpn/ta.key /etc/openvpn/server/
+
+# (si quieres dejar los del cliente aquí temporalmente como en tu guía)
+sudo cp /etc/openvpn/easy-rsa/pki/issued/cliente.crt /etc/openvpn/server/
+sudo cp /etc/openvpn/easy-rsa/pki/private/cliente.key /etc/openvpn/server/
+```
+
+Comprobación:
+```
+ls -l /etc/openvpn/server
+```
+
+```
+Deberías ver:
+ca.crt crl.pem dh.pem servidor.crt servidor.key ta.key cliente.crt cliente.key
+```
+
+**3. Configurar el servidor OpenVPN en modo. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
+
+
