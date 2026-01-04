@@ -198,7 +198,7 @@ Lo que deberia verse:
 ca.crt  crl.pem  dh.pem  servidor.crt  servidor.key  ta.key cliente.crt cliente.key
 ```
 
-**3. Configurar el servidor OpenVPN en modo. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
+**3. Configurar el servidor OpenVPN en modo TUN. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
 
 Creamos el fichero **/etc/openvpn/server/server.conf**:
 ```
@@ -531,7 +531,7 @@ ping 172.22.0.80
 Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
 ```
 
-**8. Comprobar si es posible alcanzar el equipo PC2 desde PC2 a través de la conexión VPN.**
+**8. Comprobar si es posible alcanzar el equipo PC2 desde PC1 a través de la conexión VPN.**
 
 Prueba desde PC1 a PC2:
 ```
