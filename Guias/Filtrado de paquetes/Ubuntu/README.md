@@ -87,7 +87,7 @@ sudo iptables -P INPUT ACCEPT
 sudo iptables -P FORWARD ACCEPT
 ```
 
-Bloquear todo el tráfico TCP saliente salvo el dirigido a una dirección UO concreta de nuestra subred, viendo el efecto del orden en la entrada de las dos reglas necesarias:
+Bloquear todo el tráfico TCP saliente salvo el dirigido a una dirección IP concreta de nuestra subred, viendo el efecto del orden en la entrada de las dos reglas necesarias:
 ```
 # Este es el caso correcto porque iptables evalúa las reglas en orden secuencial y aplica la primera coincidencia, sin evaluar el resto. Por tanto, si aceptamos una única conexión y luego bloqueamos el resto entonces funcionará.
 iptables -A OUTPUT -p tcp -d 192.168.126.149 -j ACCEPT
@@ -117,6 +117,23 @@ Prueba:
 ssh root@1.2.3.4 
 ```
 Deberíamos poder conectarnos
+
+**4. Desde una máquina remota, utilizar **nmap** para identificar el SO de nuestra máquina virtual Linux. Luegom aplicar una regla **CON ESTADO** para impedir conexiones TCP inválidas (las que no se inician con el segmento SYN). Volver a utilizar la herramienta nmap para identificar el SO y comentar los nuevos resultados obtenidos**
+
+Escaneo del SO con nmap antes de aplicar la regla con estado:
+```
+sudo nmap -O 192.168.126.149
+```
+
+Ahora aplicamos la regla CON ESTADO para impedir conexiones TCP inválidas (las que no se inician con el segmento SYN). Luego, volver a utilizar la herramienta nmap para identificar el SO y comentar los nuevos resultados obtenidos:
+```
+# Regla con estado para impedir conexiones TCP inválidas
+iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+```
+Ahora no es posible ver la información acerca del SO.
+
+
+
 
 
 
