@@ -72,6 +72,51 @@ sudo iptables -A OUTPUT -p tcp --sport 80 -j ACCEPT
 
 Importante tener en cuenta que cuando se habla de tráfico SALIENTE lo estamos hablando desde el punto de vista de un CLIENTE. Cuando hablamos de tráfico ENTRANTE, entonces es desde el punto de vista del SERVIDOR.
 
+**2. Se nos pide comprobar el efecto que tiene el orden de las reglas de filtrado. Partiendo de una configuración sin filtros, hay que bloquear todo el tráfico TCP saliente salvo el dirigido a una dirección IP concreta de nuestra subred, viendo el efecto del orden en la entrada de las dos reglas necesarias.**
+
+Configuración sin filtros:
+```
+
+# Reestablecer reglas
+sudo iptables -F
+sudo iptables -X
+
+# Reestablecer políticas
+sudo iptables -P OUTPUT ACCEPT
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+```
+
+Bloquear todo el tráfico TCP saliente salvo el dirigido a una dirección UO concreta de nuestra subred, viendo el efecto del orden en la entrada de las dos reglas necesarias:
+```
+# Este es el caso correcto porque iptables evalúa las reglas en orden secuencial y aplica la primera coincidencia, sin evaluar el resto. Por tanto, si aceptamos una única conexión y luego bloqueamos el resto entonces funcionará.
+iptables -A OUTPUT -p tcp -d 192.168.126.149 -j ACCEPT
+iptables -A OUTPUT -p tcp -j DROP
+```
+
+```
+# Caso incorrecto (general antes que específica)
+sudo iptables -A OUTPUT -p tcp -j DROP
+sudo iptables -A OUTPUT -p tcp -d 192.168.126.149 -j ACCEPT
+
+# Este no funciona porque si bloquea todo, luego deja de evaluar el resto de reglas porque siempre evalúa la primera regla genérica!
+
+NOTA: Nunca poner una regla genérica sin condiciones antes que las reglas específicas.
+```
+
+**3. Definir una regla que redirija todo el tráfico SSH saliente que va hacia una dirección IP concreta (por ejemplo, 1.2.3.4) para que se redirija a la IP de un servidor real que tenga el servicio SSH activo. Para probar su funcionamiento, abrir una sesión SSH contra 1.2.3.4.**
+
+Básicamente tenemos que hacer un port-forwarding para que cuando intentemos acceder a la ip 1.2.3.4 realmente estemos haciendo ssh a la 192.168.126.149 (en mi caso de subred específica):
+```
+iptables -t nat -A OUTPUT -p tcp -d 1.2.3.4 --dport 22 -j DNAT --to-destination 192.168.126.149:22
+
+```
+
+Prueba:
+```
+ssh root@1.2.3.4 
+```
+Deberíamos poder conectarnos
 
 
 
