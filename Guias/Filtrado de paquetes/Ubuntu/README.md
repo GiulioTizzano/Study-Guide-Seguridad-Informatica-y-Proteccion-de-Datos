@@ -132,6 +132,40 @@ iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
 ```
 Ahora no es posible ver la información acerca del SO.
 
+**5. Ahora hay que partir de nuevo de una configuración sin filtros y bloquear todo el tráfico entrante y saliente. Luego, definir reglas CON ESTADO para permitir iniciar conexiones TCP o UDP hacia el exterior, así como el tráfico ICMP siempre que sea iniciado por nosotros o relacionado con nuestras conexiones. Hacer comprobaciones iniciando conexiones exteriores, intentando conectar desde el exterior (por ejemplo al servidor SSH o recibiendo mensajes ping).**
+
+Configuración sin filtro y bloqueando todo tráfico entrante y saliente:
+```
+sudo iptables -F
+sudo iptables -P INPUT DROP
+sudo iptables -P OUTPUT DROP
+sudo iptables -P FORWARD DROP
+```
+
+Reglas con estado para permitir iniciar conexiones TCP o UDP hacia el exterior, así como tráfico ICMP iniciado por nosotros o relacionado con nuestras conexiones:
+```
+# Regla con estado TCP:
+sudo iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+sudo iptables -A INPUT -p tcp -m state --state ESTABLISHED, RELATED -j ACCEPT
+
+# Regla con estado UDP
+
+iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+iptables -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Regla con estado icmp
+
+iptables -A OUTPUT -p icmp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+iptables -A INPUT  -p icmp -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+```
+
+Cuando hacemos ping desde la máquina con las máquinas con estado si que permite hacer ping y recibir respuesta. Pero desde el exterior no permite hacer ping.
+
+**6. **
 
 
 
