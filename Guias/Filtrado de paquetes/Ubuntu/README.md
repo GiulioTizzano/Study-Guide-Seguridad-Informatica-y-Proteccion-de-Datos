@@ -1,5 +1,6 @@
 # Práctica 4 Filtrado de Paquetes:
 
+## Cortafuegos personal
 **1. Se nos pide establecer distinas reglas de filtrado **sin estado** sobre las cadenas INPUT y OUTPUT . Filtrar ambos sentidos de la conexión, en primer lugar realizar la política DROP para el tráfico entrante y saliente del equipo. A continuación, habilitar el intercambio ICMP con el resto de equipos de nuestra subred. Permitir el tráfico saliente hacia los puertos 80/tcp, 443/tcp y 53/udp (nuestro equipo actua como cliente). Luego, habilitar el tráfico entrante al puerto 22/tcp y 80/tcp (donde nuestro equipo actúa como servidor).**
 
 ```
@@ -197,8 +198,174 @@ Como iptables no tiene capacidad para acotar el número máximo de intentos de a
 MaxAuthTries 2
 ```
 
+Reiniciar el servicio ssh:
+```
+sudo systemctl restart ssh
+```
 
+## Cortafuegos personal con UFW
 
+**7. UFW (Uncomplicated Firewall) es una aplicación desarrollada por Canonical (Ubuntu) para
+activar reglas iptables y mantener un cortafuegos personal de manera sencilla. Para
+realizar este apartado se recomienda usar una máquina Ubuntu, que ya tienen instalado
+UFW. Llevar a cabo las siguientes tareas:**
+
+**a. Verificar el estado del cortafuegos personal y si ya existen reglas iptables**
+```
+# Comprobar estado
+sudo ufw status
+```
+
+```
+# Comprobamos si hay reglas por defecto
+sudo iptables -L -n
+```
+
+**b. Arrancar algún servicio en el equipo para realizar las pruebas posteriores (Apache2,OpenSSH Server, …) **
+```
+# Arrancamos el servidor apache y ssh para realizar pruebas para luego:
+sudo systemctl status apache2
+sudo systemctl status ssh
+```
+
+**c. Arrancar UWF y configurar su arranque automático. Iniciar el cortafuegos (ufw enable)**
+
+```
+sudo systemctl enable ufw
+sudo ufw enable
+```
+
+**d. Comprobar el estado de UFW (ufw status). También es posible ver información
+extendida (ufw status verbose) que incluye la política definida, y las reglas iptables
+generadas (iptables -L -n | more). Con este último comando podemos ver las nuevas reglas y cadenas generadas por UFW.**
+```
+# Comprobar el estado de UFW
+sudo ufw status
+
+# Ver información extendida
+sudo ufw verbose
+
+# Reglas iptables generadas
+sudo iptables -L -n | more
+```
+UFW es capaz de traducir automáticamente sus reglas a reglas de iptables.
+
+**e. Usar el comando ufw default allow|deny incoming|outgoing para definir la configuración
+por defecto del cortafuegos personal. Comprobar el efecto de estos comandos intentando conexiones hacia o desde el equipo. **
+
+```
+# Restringimos conexiones salientes y entrantes
+sudo ufw default deny incoming
+
+sudo ufw defauly deny outgoing
+```
+
+```
+# Volvemos a permitir la salida y entrada de tráfico
+sudo ufw default allow incoming
+
+sudo ufw default allow outgoing
+```
+Se puede escoger la combinación que queramos con UFW
+
+**f. Establecer una política por defecto que permita conexiones salientes e impida conexiones entrantes.**
+```
+# Denegar conexiones entrantes
+sudo ufw default deny incoming
+
+# Aceptar conexiones salientes
+sudo ufw defauly allow outgoing
+```
+```
+# Comprobar configuración
+sudo ufw status verbose
+```
+
+**g. Sobre la configuración anterior permitir conexiones entrantes a los servicios arrancados en el apartado b) (ufw allow …)**
+
+```
+# Permitir ssh
+sudo ufw allow ssh
+
+# Permitir http
+sudo ufw allow http
+
+# Ver estado
+sudo ufw status 
+```
+
+**h. También es posible limitar las conexiones realizadas desde una IP origen (ufw limit …), para mitigar los ataques de diccionario. Activar el acceso limitado al servidor SSH de nuestro equipo. ¿Qué límite se ha establecido para las conexiones SSH entrantes?**
+```
+# Limitar tráfico ssh
+sudo ufw limit ssh
+
+# limitar http
+sudo ufw limit http
+
+# Comprobar estado
+sudo ufw status
+```
+De forma predeterminada se establece un límite de 6 conexiones cada 30 segundos a nuestra máquina.
+
+## Router con función de cortafuegos y NAT
+**8. 8. Vamos a preparar una maqueta como la reflejada en el gráfico adjunto. Usaremos tres máquinas virtuales (FW, interna y externa) y asociaremos un segundo interface a la
+máquina que actúa como cortafuegos. Se recomienda usar el SO Ubuntu Server al menos en FW, ya que cuenta con los paquetes shorewall en el repositorio oficial. La red exterior tendrá un direccionamiento público (20.20.20.0/24) y la privada tendrá direccionamiento privado (10.10.10.0/24) (puede usar las redes predefinidas del entono de virtualización para ambas redes). Las máquinas interna y externa tendrán como router por defecto al
+equipo que actúa como firewall (FW). **
+
+![Diagrama/maqueta dispositivos](/Guias/Filtrado%20de%20paquetes/images/diagrama.png)
+
+Para este apartado habría que retocar el direccionamiento entrando en el netplan de las máquinas ubuntu pero no lo haremos porque en el examen no tiene sentido cambiar el direccionamiento porque sino perderemos conectividad con las máquinas.
+
+**9. Instalar shorewall en el equipo FW. También se recomienda instalar la herramienta tcpdump y algún servicio (por ejemplo, Apache) en las tres máquinas. 
+**
+
+```
+# Dentro de la máquina firewall instalamos shorewall, apache y tcpdump
+
+sudo apt install shorewall -y
+sudo apt install apache2 -y
+sudo apt install tcpdump -y
+```
+
+```
+# Dentro del resto de máquinas instalamos apache y tcpdump
+sudo apt install apache2 -y
+sudo apt install tcpdump -y
+```
+
+**10. Configurar los interfaces de red de los tres equipos y default GW en los hosts interno y
+externo. Reiniciar los servicios de red y comprobar que somos capaces de alcanzar las máquinas interna y externa desde el cortafuegos (FW). Habilitar el encaminamiento en el cortafuegos (net.ipv4.ip_forward=1 en el archivo /etc/sysctl.conf) y comprobar que es posible comunicar las máquinas interna y externa sin restricciones. Levantar algún servicio en los equipos y comprobar que es posible acceder remotamente. **
+
+```
+# Habilitar el encaminamiento en el cortafuegos entrando al archivo /etc/sysctl.conf poniendo el valor net.ipv4.ip_forward=1.
+
+sudo vi /etc/sysctl.conf
+```
+
+```
+# Comprobar que las máquinas internas y externa se puedan comunicar sin restricciones
+
+# Interna --> externa
+ping 20.20.20.150
+
+# Externa --> interna
+ping 10.10.10.150
+```
+
+Levantar algún servicio en los equipos y comprobar que es posible acceder remotamente:
+```
+# Tanto la máquina interna como la externa tienen un servidor apache corriendo con la configuración predeterminada. Por tanto, ahora haremos un curl/lynx para ver si es accesible el contenido sea accesible para la interna hacia la externa y vice versa:
+
+# Interna --> externa
+curl 20.20.20.150
+# Externa --> interna
+curl 10.10.10.150
+```
+
+** 11. Describir unas políticas básicas en el cortafuegos Shorewall: se acepta el tráfico desde la red interna al exterior (saliente), se impide tráfico entrante desde el exterior, se acepta tráfico saliente desde el cortafuegos hacia cualquier sitio. Se acepta tráfico entrante al
+cortafuegos desde la red interna. Activar las reglas (systemctl start shorewall) y verificar su
+correcto funcionamiento. 
+**
 
 
 
