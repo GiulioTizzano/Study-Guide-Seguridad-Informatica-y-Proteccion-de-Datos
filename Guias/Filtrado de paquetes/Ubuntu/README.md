@@ -165,7 +165,38 @@ iptables -A INPUT  -p icmp -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 Cuando hacemos ping desde la máquina con las máquinas con estado si que permite hacer ping y recibir respuesta. Pero desde el exterior no permite hacer ping.
 
-**6. **
+**6. Considere la siguiente situación: Se están produciendo accesos continuos a nuestro
+servidor OpenSSH para intentar descubrir mediante fuerza bruta usuarios y contraseñas
+válidas del sistema. Nos gustaría limitar el número de accesos desde una única dirección
+IP origen (por ejemplo, un máximo de 3 conexiones cada 120 segundos desde cada IP
+origen), para minimizar el riesgo este tipo de intentos sin afectar a los usuarios legítimos.
+Busque una solución para este problema mediante iptables, e indique la(s) regla(s) que
+habría que aplicar para implantar esta política y la función que cumplen. Para acotar más
+aún estos intentos de acceso es posible limitar también el número máximo de reintentos de autentificación en cada sesión (por ejemplo, a dos). ¿Cómo podríamos configurar esta nueva restricción? **
+
+```
+# 1. Registrar cada intento SSH nuevo por IP origen
+sudo iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --set --name LISTASSH --rsource
+
+2. Bloquear si una IP supera 3 intentos en 120 segundos
+sudo iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 120 --hitcount 4 --name LISTASSH --rsource -j DROP
+
+# 3. Permitir el acceso SSH si no se supera el límite
+sudo iptables -A INPUT -p tcp --dport 22 -m state --state NEW -j ACCEPT
+```
+
+Explicación funcional de las reglas
+Regla	Función
+Regla 1	Registra la IP origen de cada intento SSH nuevo
+Regla 2	Comprueba si la IP ha superado 3 intentos en 120 s y bloquea
+Regla 3	Permite el acceso SSH a IPs que no superan el límite
+
+Como iptables no tiene capacidad para acotar el número máximo de intentos de autentificación en cada sesión, podemos entonces usar el archivo de configuración de ssh que se encuentra en el directorio **/etc/ssh/sshd_config**:
+```
+# Y editamos el campo:
+MaxAuthTries 2
+```
+
 
 
 
