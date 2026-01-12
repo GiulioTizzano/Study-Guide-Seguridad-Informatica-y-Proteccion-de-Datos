@@ -22,6 +22,8 @@ network:
       nameservers:
         addresses: [8.8.8.8]
 ```
+>**IMPORTANTE:** Poner nombre de interfaz apropiada para tu maquina!!
+
 Luego, ejecutar para ver si se configuran correctamente los cambios:
 ```bash
 sudo netplan apply
