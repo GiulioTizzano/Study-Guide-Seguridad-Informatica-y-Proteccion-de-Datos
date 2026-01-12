@@ -471,7 +471,7 @@ Verificar que el tráfico se transporta por tun0 y cifrado sobre ens37:
 
 En el lado servidor:
 ```bash
-sudo tcmdump -i tun0 -n 
+sudo tcpdumpS -i tun0 -n 
 ```
 En PC1:
 ```bash
@@ -517,7 +517,7 @@ ping 172.22.0.50
 
 Si analizamos las capturas al hacer ping de PC1 --> PC2, veremos que a PC2 le llegan todos los datagramas:
 ```bash
-sudo tcmdump -i eth0 -n
+sudo tcpdump -i eth0 -n
 ```
 
 ## 9. Modificar la configuración de PC2 par que pueda comunicar con PC1 a través de la VPN. (También es posible configurar el gateway para el retorno de los paquetes a través de la VPN, sin modificar el encaminamiento de PC2) .
@@ -536,14 +536,3 @@ Ambas opciones han de funcionar
 
 ---
 ### FIN PRÁCTICA!!!
-
-
-
-
-
-
-
-
-
-
-
