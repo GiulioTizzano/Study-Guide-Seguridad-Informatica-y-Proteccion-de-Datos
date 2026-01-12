@@ -29,6 +29,11 @@ Luego, ejecutar para ver si se configuran correctamente los cambios:
 sudo netplan apply
 ```
 
+Si cuando se hace un 'ifconfig' o un 'ip a' y no sale una de las interfaces, sea porque hay que levantarla:
+```bash
+sudo ip link set eth1 up
+```
+
 ### **- Servidor VPN:**
 Ahora volvemos a editar el mismo archivo pero **para el servidor VPN** y metemos su direccionamiento correspondiente:
 
