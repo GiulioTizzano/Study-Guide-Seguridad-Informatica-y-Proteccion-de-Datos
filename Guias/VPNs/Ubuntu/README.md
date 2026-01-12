@@ -1,4 +1,4 @@
-## **1. Se nos pide crear el escenario propuesto y configurar las direcciones IP de todos los interfacesy activar el forwarding en el gateway (para poder reenviar los datagramas). Establecer el router como gateway por defecto en todos los equipos y comprobar la conectividad.**
+## 1. Se nos pide crear el escenario propuesto y configurar las direcciones IP de todos los interfacesy activar el forwarding en el gateway (para poder reenviar los datagramas). Establecer el router como gateway por defecto en todos los equipos y comprobar la conectividad.
 
 ![Escenario](/Guias/VPNs/imgs/image.png)
 
@@ -142,7 +142,7 @@ Verificar que apache funciona:
 curl http://localhost
 ```
 
-## **2. Crear una Autoridad de Certificación en el servidor y emitir los elementos necesarios para la configuración (valores DH, claves/certificados para el servidor y el cliente.**
+## 2. Crear una Autoridad de Certificación **en el servidor** y emitir los elementos necesarios para la configuración (valores DH, claves/certificados para el servidor y el cliente.)
 
 Para poder realizar este apartado bien, vamos a instalar las herramientas correspondientes necesarias (ejecutar en el servidor):
 
@@ -205,7 +205,7 @@ Deberías ver:
 ca.crt crl.pem dh.pem servidor.crt servidor.key ta.key cliente.crt cliente.key
 ```
 
-## **3. Configurar el servidor OpenVPN en modo TUN. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
+## 3. Configurar el servidor OpenVPN en modo TUN. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.
 
 Creamos el fichero **/etc/openvpn/server/server.conf**:
 
@@ -304,7 +304,7 @@ Ver rutas activas
 ip route
 ```
 
-## **4. Nos piden configurar en el gateway un port-forwarding para que el servidor interno (LAN) sea capaz de recibir el tráfico recibido en el puerto udp/1194 de su interfaz externo (gateway) (es necesaria una regla iptables NAT en PREROUTING).**
+## 4. Nos piden configurar en el gateway un port-forwarding para que el servidor interno (LAN) sea capaz de recibir el tráfico recibido en el puerto udp/1194 de su interfaz externo (gateway) (es necesaria una regla iptables NAT en PREROUTING).
 
 Para realizar la configuración del port-forwarding (PREROUTING) debemos primero de conocer cuales son los interfaces asociados al gateway. Para ello, ejecutamos lo siguiente:
 
@@ -340,7 +340,7 @@ sudo systemctl status netfilter-persistent
 ```
 La próxima vez que arranquemos la máquina la regla debería de haberse guardado.
 
-## **5. Configurar en el Gateway el enmascaramiento para todo el tráfico saliente. También hay que comprobar que se siguen pudiendo alcanzar todos los recursos externos desde la red interna (PC2 a PC1). Verificar que se realiza el enmascaramiento usando tcpdump.**
+## 5. Configurar en el Gateway el enmascaramiento para todo el tráfico saliente. También hay que comprobar que se siguen pudiendo alcanzar todos los recursos externos desde la red interna (PC2 a PC1). Verificar que se realiza el enmascaramiento usando tcpdump.
 
 Ejecutamos el siguiente comando para enmascarar el tráfico (lo ejecutamos en el GATEWAY):
 
@@ -369,7 +369,7 @@ La próxima vez que arranquemos la máquina la regla debería de haberse guardad
 
 Procedemos a realizar ping desde la máquina PC2 a la PC1 (externa --> interna).
 
-## **6. Configurar el cliente OpenVPN en el PC1 (client.conf) para conectar al servidor (a través de la IP del GATEWAY). Para completar esta tarea es necesario copiar los archivos necesarios obtenidos en el apartado 2.**
+## 6. Configurar el cliente OpenVPN en el PC1 (client.conf) para conectar al servidor (a través de la IP del GATEWAY). Para completar esta tarea es necesario copiar los archivos necesarios obtenidos en el apartado 2.
 
 ```bash
 sudo dnf install -y openvpn
@@ -442,7 +442,7 @@ sudo systemctl status openvpn-client@client
 
 ```
 
-## **7. Iniciar el cliente y comprobar que se conecta al servidor. Verificar la configuración que se establece en el interfaz virtual TUN del cliente, tabla de encaminamiento y que es posible alcanzar desde PC1 los recursos ofrecidos por el servidor a través de la VPN. A su vez, desactivar el router por defecto en PC1 y comprobar que sigue siendo posible acceder al servidor**
+## 7. Iniciar el cliente y comprobar que se conecta al servidor. Verificar la configuración que se establece en el interfaz virtual TUN del cliente, tabla de encaminamiento y que es posible alcanzar desde PC1 los recursos ofrecidos por el servidor a través de la VPN. A su vez, desactivar el router por defecto en PC1 y comprobar que sigue siendo posible acceder al servidor
 
 Iniciar el cliente OpenVPN:
 ```bash
@@ -507,7 +507,7 @@ ping 172.22.0.80
 Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
 
 
-## **8. Comprobar si es posible alcanzar el equipo PC2 desde PC1 a través de la conexión VPN.**
+## 8. Comprobar si es posible alcanzar el equipo PC2 desde PC1 a través de la conexión VPN.
 
 Prueba desde PC1 a PC2:
 ```bash
@@ -520,7 +520,7 @@ Si analizamos las capturas al hacer ping de PC1 --> PC2, veremos que a PC2 le ll
 sudo tcmdump -i eth0 -n
 ```
 
-## **9. Modificar la configuración de PC2 par que pueda comunicar con PC1 a través de la VPN. (También es posible configurar el gateway para el retorno de los paquetes a través de la VPN, sin modificar el encaminamiento de PC2) .**
+## 9. Modificar la configuración de PC2 par que pueda comunicar con PC1 a través de la VPN. (También es posible configurar el gateway para el retorno de los paquetes a través de la VPN, sin modificar el encaminamiento de PC2) .
 
 Configuración de PC2 para poder comunicar con PC1:
 ```bash
