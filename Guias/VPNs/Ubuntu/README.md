@@ -210,7 +210,7 @@ ca.crt crl.pem dh.pem servidor.crt servidor.key ta.key cliente.crt cliente.key
 Creamos el fichero **/etc/openvpn/server/server.conf**:
 
 ```bash
-sudo vi /etc/openvpn/server/servidor.conf
+sudo vi /etc/openvpn/server/server.conf
 ```
 
 Configuración dentro del fichero **server.conf**:
