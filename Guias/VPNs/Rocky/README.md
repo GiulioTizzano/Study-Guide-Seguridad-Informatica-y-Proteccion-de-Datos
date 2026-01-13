@@ -4,8 +4,10 @@
     y activar el forwarding en el gateway (para poder reenviar los datagramas). Establecer el router como gateway por defecto en todos los equipos
     y comprobar la conectividad.**
 
+![escenario](../imgs/image.png)
+
 **- Gateway:**
-```
+```bash
 # Ver los nombres de los interfaces reales de la máquina:
 nmcli con show
 
@@ -25,7 +27,7 @@ nmcli con up eth1
 
 ```
 **- Servidor VPN:**
-```
+```bash
 nmcli con mod eth0 ipv4.addresses 172.22.0.80/24 ipv4.method manual
 nmcli con mod eth0 ipv4.gateway 172.22.0.10
 (no necesario) nmcli con mod eth0 ipv4.dns 8.8.8.8
@@ -33,7 +35,7 @@ nmcli con up eth0
 ```
 
 **- PC1 (cliente1):**
-```
+```bash
 nmcli con mod eth0 ipv4.addresses 40.40.40.30/24 ipv4.method manual
 nmcli con mod eth0 ipv4.gateway 40.40.40.10
 (No hace falta) nmcli con mod eth0 ipv4.dns 8.8.8.8
@@ -42,7 +44,7 @@ nmcli con up eth0
 ```
 
 **- PC2 (cliente2):**
-```
+```bash
 nmcli con mod eth0 ipv4.addresses 172.22.0.50/24 ipv4.method manual
 nmcli con mod eth0 ipv4.gateway 172.22.0.10
 (No es necesario) nmcli con mod eth0 ipv4.dns 8.8.8.8
@@ -52,36 +54,38 @@ nmcli con up eth0
 Ir al gateway y aplicar los siguientes cambios:
 
 Ir al fichero:
-```
+```bash
 sudo vi /etc/sysctl.conf
 ```
 
 Agregar o descomentar la línea:
-```
+```conf
 net.ipv4.ip_forward = 1
 ```
 
 Aplicar los cambios:
-```
+```bash
 sudo sysctl -p
 ```
 
 Verificar que se han realizado los cambios:
+```bash
+sysctl net.ipv4.ip_forward 
 ```
-sysctl net.ipv4.ip_forward (se debe mostrar esto --> net.ipv4.ip_forward = 1
-)
-```
+>(se debe mostrar esto --> net.ipv4.ip_forward = 1)
+
 **Posteriormente comprobar la conectividad entre los dispositivos realizando los PINGs necesarios**
 
 Para poder instalar openssh y apache en Rocky podemos ejecutar los siguientes comandos (por si acaso):
 
-```
+```bash
 sudo dnf install -y httpd openssh-server
 sudo systemctl enable --now httpd
 sudo systemctl enable --now sshd
 ```
+
 Verificar que apache funciona:
-```
+```bash
 curl http://localhost
 ```
 
@@ -89,20 +93,20 @@ curl http://localhost
 
 Para poder realizar este apartado bien, vamos a instalar las herramientas correspondientes necesarias (ejecutar en el servidor):
 
-```
-Activar el repositorio EPEL (requerido por easy-rsa):
+```bash
+# Activar el repositorio EPEL (requerido por easy-rsa):
 sudo dnf install -y epel-release
 
 Instalar OpenVPN y EasyRSA:
 sudo dnf install -y openvpn easy-rsa
 
-Herramientas adicionales (para diagnóstico y red):
+# Herramientas adicionales (para diagnóstico y red):
 sudo dnf install -y iproute iptables tcpdump net-tools bind-utils
 ```
 
 Luego, pasamos a crear un entorno de trabajo para el PKI:
 
-```
+```bash
 sudo mkdir -p /etc/openvpn/easy-rsa
 sudo cp -r /usr/share/easy-rsa/3/* /etc/openvpn/easy-rsa/
 sudo chown -R $(whoami) /etc/openvpn/easy-rsa
@@ -110,7 +114,7 @@ cd /etc/openvpn/easy-rsa
 ```
 Posteriormente, inicializamos la estructura de la PKI (creará el directorio pki/):
 
-```
+```bash
 ./easyrsa init-pki
 ```
 
@@ -118,7 +122,7 @@ Ahora pasamos a crear la autoridad de Certificación (CA):
 
 Creamos la CA, que será la encargada de firmar los certificados del servidor y los clientes:
 
-```
+```bash
 ./easyrsa build-ca
 ```
 Introducimos una frase de paso (que queramos), y asignamos un Common Name (CN) representativo (yo he puesto RedVPN-CA, como ejemplo).
@@ -127,24 +131,24 @@ Introducimos una frase de paso (que queramos), y asignamos un Common Name (CN) r
 Ahora, procedemos con la generación de claves y certificados:
 
 Clave y certificado del servidor:
-```
+```bash
 ./easyrsa build-server-full servidor nopass
 ```
 
 Clave y certificado del cliente:
-```
+```bash
 ./easyrsa build-client-full cliente nopass
 ```
 
 Parámetros Diffie-Hellmann:
-```
+```bash
 ./easyrsa gen-dh
 ```
 
 Creamos la lista de certificados recovados:
 
 Generamos la CRL
-```
+```bash
 ./easyrsa gen-crl
 ```
 
@@ -167,18 +171,18 @@ Archivos Obtenidos Descripción:
 -------------------------------------------------------------------------
 
 Generación de la clave TLS compartida (opcional, pero altamente recomendada):
-```
+```bash
 cd /etc/openvpn
 sudo openvpn --genkey --secret ta.key
 ```
 
 Archivo que se ha tenido que crear (puede saltar un aviso de que está deprecado, pero sigue funcionando):
-```
+```bash
 /etc/openvpn/ta.key
 ```
 
 Ahora toca organizar los ficheros creados y pasarlos a la carpeta /etc/openvpn/server para que se quede todo bien guardado:
-```
+```bash
 sudo cp /etc/openvpn/easy-rsa/pki/ca.crt /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/issued/servidor.crt /etc/openvpn/server/
 sudo cp /etc/openvpn/easy-rsa/pki/private/servidor.key /etc/openvpn/server/
@@ -191,22 +195,22 @@ sudo cp pki/private/cliente.key /etc/openvpn/server/
 ```
 
 Comprobación final:
-```
+```bash
 ls /etc/openvpn/server
 
-Lo que deberia verse:
+# Lo que deberia verse:
 ca.crt  crl.pem  dh.pem  servidor.crt  servidor.key  ta.key cliente.crt cliente.key
 ```
 
 **3. Configurar el servidor OpenVPN en modo TUN. Usaremos UDP como protocolo de transporte (puerto 1194), configurar su arranque automático e iniciar el servicio. Habilitar el forwarding del servidor para que pueda encaminar el tráfico entre sus interfaces.**
 
 Creamos el fichero **/etc/openvpn/server/server.conf**:
-```
-sudo vi /etc/openvpn/server/servidor.conf
+```bash
+sudo vi /etc/openvpn/server/server.conf
 ```
 
 Configuración dentro del fichero **server.conf**:
-```
+```conf
 
 # ================================
 # CONFIGURACIÓN DEL SERVIDOR OPENVPN (MODO TUN - UDP)
@@ -252,34 +256,34 @@ verb 4
 
 Luego, tenemos que activar el **FORWARDING** también en el servidor, para ello manipulamos el fichero que se encuentra aquí:
 
-```
+```bash
 sudo vi /etc/sysctl.conf
-
+```
 y agregar o descomentar la siguiente línea:
-
+```conf
 net.ipv4.ip_forward = 1
 ```
 
 Aplicamos los cambios:
-```
+```bash
 sudo sysctl -p
 sysctl net.ipv4.ip_forward
 
-Debería verse como resultado:
+# Debería verse como resultado:
 net.ipv4.ip_forward = 1
 ```
 
 Arrancamos el serivico de OpenVPN en el lado del servidor:
-```
+```bash
 sudo systemctl start openvpn-server@server
 sudo systemctl enable openvpn-server@server
 ```
 
 Comprobación del estado:
-```
+```bash 
 sudo systemctl status openvpn-server@server
 
-Si salta algún error, ejecutar el siguiente comando:
+# Si salta algún error, ejecutar el siguiente comando:
 
 sudo journalctl -u openvpn-server@server (-n 20)
 ```
@@ -287,14 +291,14 @@ sudo journalctl -u openvpn-server@server (-n 20)
 Comprobaciones de funcionamiento:
 
 Ver interfaz TUN creada
-```
+```bash
 ip addr show
 ip a
 ip a show tun0
 ```
 
 Ver rutas activas
-```
+```bash
 ip route
 ```
 
@@ -302,26 +306,26 @@ ip route
 
 Para realizar la configuración del port-forwarding (PREROUTING) debemos primero de conocer cuales son los interfaces asociados al gateway. Para ello, ejecutamos lo siguiente:
 
-```
+```bash
 ip a
 ```
 
 Con esto, deberíamos de ver los interfaces con sus IPs asociadas. Nosotros, vamos a aplicar la regla de PREROUTING al interfaz que dé directamente CONECTIVIDAD hacia el exterior (en mi caso es el eth1 de mi gateway). Por tanto, ejecutamos el siguiente comando para aplicar la regla según lo que pide el enunciado:
 
-```
+```bash
 sudo iptables -t nat -A PREROUTING -p udp --dport 1194 -i eth1 -j DNAT --to-destination 172.22.0.80:1194
 ```
 En este caso la IP **172.22.0.80** es la dirección IP de la interfaz de mi servidor interno.
 
 Tras ejecutar el comando, deberíamos ir al servidor y abrir el programa tcpdump para verificar que lleguen conexiones desde el exterior (PC1). Ejecutamos el siguiente comando dentro del servidor para analizar el tráfico:
 
-```
+```bash
 sudo tcpdump -i eth0
 ```
 
 Y, desde el PC1/cliente1 lanzamos el siguiente comando:
 
-```
+```bash
 ping 172.22.0.80
 ```
 
@@ -329,13 +333,13 @@ Deberíamos poder ver como llegan los datagramas al servidor interno.
 
 También, para comprobar que la regla se haya aplicado correctamente, deberíamos ejecutar lo siguiente desde el GATEWAY:
 
-```
+```bash
 sudo iptables -t nat -L PREROUTING -n -v
 ```
 
 Dentro de la Rocky Linux, las reglas de iptables no se guardan automáticamente y para que sean persistentes tras reiniciar el gateway hace falta ejecutar el siguiente comando (dentro del GATEWAY):
 
-```
+```bash
 sudo iptables-save > /etc/sysconfig/iptables
 ```
 La próxima vez que arranquemos la máquina la regla debería de haberse guardado.
@@ -345,38 +349,38 @@ La próxima vez que arranquemos la máquina la regla debería de haberse guardad
 
 Ejecutamos el siguiente comando para enmascarar el tráfico (lo ejecutamos en el GATEWAY):
 
-```
+```bash
 sudo iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
 ```
 
 Comprobamos que se haya completado correctamente la regla ejecutando el siguiente comando:
 
-```
+```bash
 sudo iptables -t nat -L POSTROUTING -n -v
 ```
 
 Para guardar la configuración (darle persistencia), debemos de ejecutar los siguientes comandos:
 
-```
+```bash
 sudo iptables-save > /etc/sysconfig/iptables
 ```
 
 Ahora comprobamos la conectividad desde la red interna (también podríamos comprobarlo desde el servidor para confirmar del todo):
 Desde PC2:
 
-```
+```bash
 ping 40.40.40.30
 ```
 
 Luego, para demostrar el enmascaramiento usaremos tcpdump. Para ello, desde el GATEWAY ejecutamos lo siguiente:
 
-```
+```bash
 sudo tcpdump -i eth1 -n icmp
 ```
 
 Luego, desde PC2 lanzamos ping a PC1:
 
-```
+```bash
 ping 40.40.40.30
 ```
 Veremos paquetes ICMP saliendo con IP origen 40.40.40.10 aunque realmente el emisor era otro.
@@ -385,20 +389,20 @@ Veremos paquetes ICMP saliendo con IP origen 40.40.40.10 aunque realmente el emi
 
 En el PC1/cliente1 instalamos OpenVPN:
 
-```
+```bash
 sudo dnf install -y openvpn
 ```
 
 Luego, creamos el directorio de configuración del cliente:
 
-```
+```bash
 sudo mkdir -p /etc/openvpn/client
 cd /etc/openvpn/client
 ```
 
 Ahora copiamos los archivos necesarios para el cliente desde el servidor VPN. Eso incluye el ca.crt, cliente.crt, cliente.key y el ta.key:
 
-```
+```bash
 scp root@172.22.0.80:/etc/openvpn/server/ca.crt .
 scp root@172.22.0.80:/etc/openvpn/easy-rsa/pki/issued/cliente.crt .
 scp root@172.22.0.80:/etc/openvpn/easy-rsa/pki/private/cliente.key .
@@ -407,7 +411,7 @@ scp root@172.22.0.80:/etc/openvpn/server/ta.key .
 
 Tras copiar todos los ficheros correspondientes a nuestra máquina cliente, deberíamos ver lo siguiente:
 
-```
+```bash
 ca.crt
 cliente.crt
 cliente.key
@@ -416,9 +420,11 @@ ta.key
 
 Ahora creamos el archivo de configuración del cliente **client.conf** y le metemos la siguiente estructura al archivo:
 
-```
+```bash
 sudo vi /etc/openvpn/client/client.conf
+```
 
+```conf
 
 # ================================
 # CLIENTE OPENVPN - MODO TUN (UDP)
@@ -451,7 +457,7 @@ persist-tun
 
 Una vez configurado, le damos a iniciar el servicio, habilitamos el servicio para que arranque en cuanto arranque la máquina y comprobamos su estado:
 
-```
+```bash
 sudo systemctl start openvpn-client@client
 sudo systemctl enable openvpn-client@client
 sudo systemctl status openvpn-client@client
@@ -461,51 +467,51 @@ sudo systemctl status openvpn-client@client
 **7. Iniciar el cliente y comprobar que se conecta al servidor. Verificar la configuración que se establece en el interfaz virtual TUN del cliente, tabla de encaminamiento y que es posible alcanzar desde PC1 los recursos ofrecidos por el servidor a través de la VPN. A su vez, desactivar el router por defecto en PC1 y comprobar que sigue siendo posible acceder al servidor**
 
 Iniciar el cliente OpenVPN:
-```
+```bash
 sudo systemctl start openvpn-client@client
 sudo systemctl status openvpn-client@client
 ```
 
 Comprobar el interfaz virtual tun:
 
-```
-ip a show tun0 (se deberñia ver la configuración punto a punto de las direcciones IP)
+```bash
+ip a show tun0 # (se deberñia ver la configuración punto a punto de las direcciones IP)
 ```
 
 Verificamos la tabla de encaminamiento en PC1:
-```
+```bash
 ip route
 ```
 
 Comprobar conectividad hacia los recursos del servidor:
 
-```
+```bash 
 ping 172.16.0.1 (debemos obtener respuesta del PING)
 ping 172.22.0.80 (debemos obtener respuesta del PING)
 ```
 
 Verificar que el tráfico se transporta por tun0 y cifrado sobre eth0:
-```
-En el lado servidor:
-sudo tcmdump -i tun0 -n 
+```bash
+# En el lado servidor:
+sudo tcpdump -i tun0 -n 
 
-En PC1:
+# En PC1:
 ping 172.22.0.80
 
-En la captura veremos ICMP normales porque tun0 ya contiene el tráfico descifrado
+# En la captura veremos ICMP normales porque tun0 ya contiene el tráfico descifrado
 
-En cambio, cuando miramos al interfaz del gateway (eth0) que conecta a la red interna, veremos que las capturas deben mostrar paquetes UDP cifrados. Dado que, PC1 encapsula su tráfico dentro de OpenVPN, el gateway reenvía el tráfico cifrado y el servidor descifra en tun0:
+# En cambio, cuando miramos al interfaz del gateway (eth0) que conecta a la red interna, veremos que las capturas deben mostrar paquetes UDP cifrados. Dado que, PC1 encapsula su tráfico dentro de OpenVPN, el gateway reenvía el tráfico cifrado y el servidor descifra en tun0:
 
-En el gateway:
+# En el gateway:
 sudo tcpdump -i eth0 udp port 1194 -n
 
-En PC1:
+# En PC1:
 ping 172.22.0.80
 ```
 
 Ahora desactivamos el router por defecto en PC1 y comprobamos el acceso al servidor:
 
-```
+```bash 
 nmcli con mod eth0 ipv4.gateway ""
 nmcli con down eth0
 nmcli con up eth0
@@ -514,49 +520,50 @@ ip route
 
 Ahora probamos el accesso al servidor sin GATEWAY por defecto:
 
-```
+```bash 
 nmcli con mod eth0 ipv4.addresses 40.40.40.30/24 ipv4.method manual
 nmcli con mod eth0 ipv4.gateway ""
 nmcli con up eth0
 
 
-Comprobar que no tiene gateway por defecto el PC1:
+# Comprobar que no tiene gateway por defecto el PC1:
 
 nmcli con show eth0 | grep ipv4.gateway
 
-Luego, lanzamos ping al servidor:
+# Luego, lanzamos ping al servidor:
 ping 172.22.0.80
 
 
-Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
+# Debería de funcionar la conectividad sin necesidad de la ruta por defecto, porque las comunicaciones pasan por el canal del túnel.
 ```
 
 **8. Comprobar si es posible alcanzar el equipo PC2 desde PC1 a través de la conexión VPN.**
 
 Prueba desde PC1 a PC2:
-```
+```bash 
 ping 172.22.0.50 
 
-Lo normal es que no responda, pero no porque PC2 no reciba los paquetes, sino porque PC2 no sabe como volver a PC1 (no conoce como llegar a PC1).
+# Lo normal es que no responda, pero no porque PC2 no reciba los paquetes, sino porque PC2 no sabe como volver a PC1 (no conoce como llegar a PC1).
 
-Si analizamos las capturas al hacer ping de PC1 --> PC2, veremos que a PC2 le llegan todos los datagramas:
+# Si analizamos las capturas al hacer ping de PC1 --> PC2, veremos que a PC2 le llegan todos los datagramas:
 
-sudo tcmdump -i eth0 -n
+sudo tcpdump -i eth0 -n
 ```
 
 **9. Modificar la configuración de PC2 par que pueda comunicar con PC1 a través de la VPN. (También es posible configurar el gateway para el retorno de los paquetes a través de la VPN, sin modificar el encaminamiento de PC2) .**
 
 Configuración de PC2 para poder comunicar con PC1:
-```
+```bash
+# PC2
 sudo ip route add 172.16.0.0/24 via 172.22.0.80
 ```
 
 O también, es posible configurar la devuelta de los paquetes en el propio Gateway (más cómodo en el caso hipotético de que hubiera más dispositivos en la red y de no querer configurar uno por uno los dispositivos):
 
-```
+```bash
+# O en el Gateway
 sudo ip route add 172.16.0.0/24 via 172.22.0.80
-
 ```
 Ambas opciones han de funcionar
 
-FIN PRÁCTICA
+## FIN PRÁCTICA!!!!
