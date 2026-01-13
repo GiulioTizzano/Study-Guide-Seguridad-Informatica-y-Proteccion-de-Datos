@@ -14,7 +14,7 @@ propio equipo de usuario, o cualquier otro que cuente con interface gráfico y n
 ![alt text](./imgs/rocky.png)
 ---
 
-### 1. Comprobar fecha y hora de la máquina virtual. Si no está bien, actualizar la fecha y hora del sistema (importante porque si no fallará al emitir los certificados)
+## 1. Comprobar fecha y hora de la máquina virtual. Si no está bien, actualizar la fecha y hora del sistema (importante porque si no fallará al emitir los certificados)
 >**IMPORTANTE:** Esto es importante para la maquina que emite los certificados
 
 Nos fijamos que la fecha y hora esten correctas:
@@ -37,7 +37,7 @@ Timedatectl # (Verificar la información)
 ---
 ---
 
-### 2. Instalacion de Apache y de SSL
+## 2. Instalacion de Apache y de SSL
 ---
 
 En la **Rocky** instalamos ambos **Apache y SSL**
@@ -69,7 +69,7 @@ sudo systemctl enable apache2
 ---
 ---
 
-### 3. Creacion de la CA, creacion de claves pub y pem, y un cert autofirmado. TODO ESTO EN LA MAQUINA CA (ROCKY)
+## 3. Creacion de la CA, creacion de claves pub y pem, y un cert autofirmado. TODO ESTO EN LA MAQUINA CA (ROCKY)
 
 Tenemos que crear una autoridad (CA) propia con los siguientes parametros:
 - **CountryName**: ES
@@ -193,7 +193,7 @@ La estructura por ahora es la siguiente:
 ---
 ---
 
-### 4. Pareja de claves pub/priv RSA de 2048 bits para el server web y un certificado firmado por nuestra CA.
+## 4. Pareja de claves pub/priv RSA de 2048 bits para el server web y un certificado firmado por nuestra CA.
 
 **CN y Nombre alternativo SAN**: www.miservidor.es
 
@@ -219,15 +219,151 @@ Y creamos el CSR y ponemos el CommonName = www.miservidor.es:
 ```bash
 sudo openssl req -new -key server-key.pem -out server-csr.pem
 ```
+>**IMPORTANTE:**Poner el CN coreecto, en este caso www.miservidor.es
 
 Y ahora firmamos el CSR con nuestra CA:
 ```bash
-sudo openssl ca -estensions server_SAN -in server-csr.pem -out server-crt.pem -days 730
+sudo openssl ca -extensions server_SAN -in server-csr.pem -out server-crt.pem -days 730
 
 # nos pide darle a 'y' para firmar
 ```
 
 Lo siguiente es configurar el servidor Apache.
 
-Creamos el directorio para el DocumentRoot, /projects/miservidor:
+Creamos el directorio para el DocumentRoot, /projects/miservidor y un archivo index.html:
 ```bash
+sudo mkdir /projects
+sudo mkdir /projects/miservidor
+sudo vim /projects/miservidor/index.html
+```
+
+Y creamos el archivo **/etc/httpd/conf.d/miservidor.conf**:
+```apache
+# Para que se redirija HTTP a HTTPS
+<VirtualHost *:80>
+        Servername www.miservidor.es
+</VirtualHost>
+
+<VirtualHost *:443>
+        ServerName www.miservidor.es
+        DocumentRoot "/projects/miservidor"
+
+        SSLEngine on
+        SSLCertificateFile /etc/pki/tls/server-crt.pem
+        SSLCertificateKeyFile /etc/pki/tls/server-key.pem
+        SSLCertificateChainFile /etc/pki/tls/server-csr.pem
+
+        SSLCACertificateFile /etc/pki/tls/cacert.pem
+
+        <Directory /projects/miservidor>
+                Options Indexes FollowSymLinks
+                AllowOverride None
+                Require all granted
+        </Directory>
+</VirtualHost>
+```
+
+Comprobamos la config y reniniciamos apache:
+```bash
+sudo apachectl configtest
+sudo systemctl restart httpd
+sudo systemctl status httpd
+```
+
+---
+Para hacer las comprobaciones en nuestra maquina windows, pasamos el 'cacert.pem' con WinSCP:
+
+![winscp](imgs/winscp.png)
+
+Y ponemos el cacert.pem en el Trusted Root Certification Authorities (windows ->
+manage user certificates):
+
+![win certs](imgs/trustedcerts.png)
+
+Y en Firefox, en certificate manager:
+
+![firefox](imgs/firefoxcerts.png)
+
+
+Y modificamos el archivo hosts de windows (c:/windows/system32/drivers/etc/hosts) y metemos lo siguiente:
+```txt
+192.168.217.147 www.miservidor.es miservidor.es https://miservidor.es http://miservidor.es
+```
+
+Y si ponemos el dominio en el buscador deberia de salir sin problemas y sin avisos.
+
+---
+---
+
+## 5. Certificados de CLIENTE con departamentos
+
+### Crear un certificado para **Carmen Cabrera (CN)**, del departmento de **Contabilidad (OU)**, firmado por la CA.
+
+Creamos el certificado de Carmen firmado por la CA:
+```bash
+cd /etc/pki/tls
+sudo openssl req -new -keyout carmen-cabrera-key.pem -out carmen-cabrera-csr.pem -noenc
+```
+>Organizational Unit Name (eg, section) [ ]: Contabilidad
+
+>Common Name (eg, your name or your server's hostname) [ ]: Carmen Cabrera
+
+Metemos al final del archivo de openssl.cnf la extension/directiva [ user ]:
+```conf
+[ user ]
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer:always
+keyUsage = digitalSignature
+extendedKeyUsage = clientAuth
+```
+
+Firmamos con la CA para obtener el crt:
+```bash
+sudo openssl ca -extensions user -in carmen-cabrera-csr.pem -out carmen-cabrera-crt.pem -days 730
+
+# Y ponemos la passphrase de la CA (era 1234)
+# Y firmamos -> y
+```
+
+Y creamos el archivo carmen-cabrera-crt.p12:
+```bash
+openssl pkcs12 -export -in carmen-cabrera-crt.pem -inkey carmen-cabrera-key.pem -out carmen-cabrera-crt.p12
+
+# Y ponemos una password para la exportacion (la que se usa para el buscador)
+```
+
+Modificamos el archivo /etc/httpd/conf.d/miservidor.conf y metemos que se requiera verificacion:
+```apache
+<VirtualHost *:80>
+        Servername www.miservidor.es
+</VirtualHost>
+
+<VirtualHost *:443>
+        ...
+
+        # Esto
+        SSLVerifyClient require 
+         
+        <Directory /projects/miservidor>
+                ...
+        </Directory>
+</VirtualHost>
+```
+>Ahora nos pedira un cert valido para acceder
+
+Y reiniciamos apache:
+```bash
+sudo systemctl restart httpd
+```
+
+**Descargamos el certificado .p12 con WinSCP como antes y lo importamos a FireFox en "Your Certificates", nos pedira la password de la exportacion a .p12**
+
+Y usando ese certificado podremos entrar a la pagina.
+
+---
+---
+
+## 6. Acceso a paginas por departamento
+
+### 
