@@ -431,6 +431,42 @@ loc     fw              ACCEPT
 # THE FOLOWING POLICY MUST BE LAST
 all     all             REJECT          $LOG_LEVEL
 ```
+Luego, verificamos que se hayan aplicado correctamente las reglas haciendo:
+```
+Desde la interna -> externa:
+ping 20.20.20.150
+
+Debería funcionar
+
+Desde la externa -> interna:
+ping 10.10.10.150
+
+No debería funcionar los pings
+```
+
+**12. Habilitar el enmascaramiento de direcciones desde la red interior hacia la red exterior.
+Verificar que todo el tráfico saliente se enmascara (puede usar el sniffer tcpdump). Se recomienda desactivar el GW en la máquina Externa y comprobar que sigue siendo posible alcanzar sus servicios desde el interior**.
+
+Para habilitar el enmascaramiento tenemos que editar el fichero /etc/shorewall/snat y meterle la subred de la dirección IP pública con su correspondiente dirección IP:
+```
+MASQUERADE          10.10.10.0/24       NET_IF
+```
+
+Quitar el gateway por defecto para la máquina externa para comprobar su funcionamiento correcto. Luego, desde la máquina interna comprobamos que llegen los ping, y que desde la externa a la interna no:
+```
+Interna -> externa:
+ping 20.20.20.150
+
+Debería funcionar
+
+Externa --> interna:
+ping 10.10.10.150
+
+No debería funcionar
+```
+
+**13. Implantar una política restrictiva para el tráfico del FW: todo el tráfico entrante, saliente y que atraviesa el FW será rechazado. A continuación, se  habilitará la salida a servicios concretos (http, https, SMTP, …). Configurar algún servicio de port forwarding (como Apache) que será visible desde el exterior y ofrecido por la máquina de la red interna. Configurar un acceso al cortafuegos por SSH desde una dirección externa concreta. Establecer el redireccionamiento de todo el tráfico DNS saliente para que se reenvíe a un servidor de DNS externo concreto.
+Para realizar este apartado se recomienda estudiar los ejemplos de reglas shorewall presentes en el manual de esta aplicación (man shorewall-rules). **
 
 
 
