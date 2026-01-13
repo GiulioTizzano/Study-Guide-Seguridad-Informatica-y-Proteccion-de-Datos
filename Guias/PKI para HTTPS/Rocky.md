@@ -219,7 +219,7 @@ Y creamos el CSR y ponemos el CommonName = www.miservidor.es:
 ```bash
 sudo openssl req -new -key server-key.pem -out server-csr.pem
 ```
->**IMPORTANTE:**Poner el CN coreecto, en este caso www.miservidor.es
+>**IMPORTANTE:** Poner el CN coreecto, en este caso www.miservidor.es
 
 Y ahora firmamos el CSR con nuestra CA:
 ```bash
