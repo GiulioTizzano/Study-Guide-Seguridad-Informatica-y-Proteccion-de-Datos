@@ -4,6 +4,8 @@
     y activar el forwarding en el gateway (para poder reenviar los datagramas). Establecer el router como gateway por defecto en todos los equipos
     y comprobar la conectividad.**
 
+![escenario](../imgs/image.png)
+
 **- Gateway:**
 ```bash
 # Ver los nombres de los interfaces reales de la máquina:
