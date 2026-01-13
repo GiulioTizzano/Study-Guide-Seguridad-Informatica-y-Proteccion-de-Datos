@@ -367,6 +367,71 @@ cortafuegos desde la red interna. Activar las reglas (systemctl start shorewall)
 correcto funcionamiento. 
 **
 
+Entramos dentro de la máquina FW y iniciamos y activamos el demonio de shorewall en caso de que no esté corriendo:
+```
+sudo systemctl status shorewall
+sudo systemctl enable shorewall
+sudo systemctl start shorewall
+```
+Luego, vemos los archivos que hay bajo el directorio /etc/shorewall/:
+```
+sudo ls /etc/shorewall
+```
+
+```
+Deberían poderse ver los ficheros siguientes:
+
+conntrack interfaces params policy rules shorewall.conf zones
+
+En caso de que no estén, podemos ir al directorio:
+
+cd /usr/share/doc/shorewall/examples
+
+Ahí podremos mover a nuestro directorio /etc/shorewall algunos ejemplos más comúnes de configuración de los ficheros que necesitamos en caso de que no estén ahí.
+```
+
+Ahora explicaremos brevemenete para que sirve cada fichero para entenderlo:
+```
+Archivo zones --> las zonas en las que se descompone la red que ve shorewall:
+loc: zona privada/local
+dmz: zona desmilitarizada donde se encuentran los recursos restringidos de tu red pero con acceso a Internet
+net: zona insegurda, habitualmente Internet
+fw: nuestro propio equipo (que actua de firewall)
+
+Archivo policy --> archivo donde se definen las políticas por defecto
+
+Archivo rules --> define excepciones a las políticas por defecto
+
+Archivo interfaces --> lista de interfaces de red del equipo, asociadas a las zonas en las que están presentes
+
+Archivo masq/snat --> establece el enmascaramiento de las direcciones IP (dirección privada --> pública)
+
+Archivo dnat --> para el port-forwarding
+```
+
+Se nos pide lo siguiente **Aceptar el tráfico desde la red interna al exterior (saliente) , se impide tráfico entrante desde el exterior, se acepta tráfico saliente desde el cortafuegos hacia cualquier sitio. Se acepta tráfico entrante al cortafuegos desde la red interna.**:
+```
+Para ello, primero preparamos los ficheros en /etc/shorewall:
+
+sudo mv /usr/share/doc/shorewall/examples/two-interfaces/zones /etc/shorewall
+sudo mv /usr/share/doc/shorewall/examples/two-interfaces/interfaces /etc/shorewall
+sudo mv /usr/share/doc/shorewall/examples/two-interfaces/policy /etc/shorewall
+
+```
+
+Luego, en el archivo **policy** ponemos una regla para **aceptar el tráfico desde la red interna al exterior**:
+```
+###############################################################################
+#SOURCE DEST            POLICY          LOGLEVEL        RATE    CONNLIMIT
+
+loc     net             ACCEPT
+net     loc             DROP
+fw      all             ACCEPT          $LOG_LEVEL
+loc     fw              ACCEPT
+# THE FOLOWING POLICY MUST BE LAST
+all     all             REJECT          $LOG_LEVEL
+```
+
 
 
 
