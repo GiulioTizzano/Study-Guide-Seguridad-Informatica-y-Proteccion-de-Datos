@@ -242,10 +242,13 @@ Y creamos el archivo **/etc/httpd/conf.d/miservidor.conf**:
 # Para que se redirija HTTP a HTTPS
 <VirtualHost *:80>
         Servername www.miservidor.es
+        ServerAlias miservidor.es
+        Redirect / https://www.miservidor.es/
 </VirtualHost>
 
 <VirtualHost *:443>
         ServerName www.miservidor.es
+        ServerAlias miservidor.es
         DocumentRoot "/projects/miservidor"
 
         SSLEngine on
@@ -337,7 +340,7 @@ sudo openssl pkcs12 -export -in carmen-cabrera-crt.pem -inkey carmen-cabrera-key
 Modificamos el archivo /etc/httpd/conf.d/miservidor.conf y metemos que se requiera verificacion:
 ```apache
 <VirtualHost *:80>
-        Servername www.miservidor.es
+        # ...
 </VirtualHost>
 
 <VirtualHost *:443>
@@ -439,6 +442,7 @@ Y ponemos lo siguiente en **/etc/httpd/conf.d/miservidor.conf** :
         # ...
 
         SSLVerifyClient require
+
         # Estas dos lineas
         SSLCARevocationCheck chain
         SSLCARevocationFile /etc/pki/tls/crl.pem
@@ -456,9 +460,12 @@ sudo systemctl restart httpd
 
 #### Ahora al intentar usar ese certificado no dejara
 
+---
+---
+
 ## 8. Firmar certificados de otros servidores
 
-### En la maquina Ubuntu que tenemos 
+### En la maquina Ubuntu que tenemos :
 
 La maquina tiene los siguientes dominios:
 - www.pruebas.com
@@ -491,6 +498,7 @@ DNS.4 = www.pruebas.net
 
 Y creamos el CSR con el **CN = pruebas.com** :
 ```bash
+# pide password de la CA
 sudo openssl req -new -key pruebas.key -out pruebas.csr -config pruebas.cnf -subj "/CN=pruebas.com"
 
 # tendriamos que tener: pruebas.csr, pruebas.key y pruebas.cnf
@@ -499,7 +507,7 @@ sudo openssl req -new -key pruebas.key -out pruebas.csr -config pruebas.cnf -sub
 Copiamos los archivos pruebas.csr y pruebas.cnf a la maquina Rocky con la CA:
 ```bash
 sudo scp pruebas.csr root@<IP_de_CA>:/etc/pki/tls
-sudo scp pruebas.cnf root@<IP_de_CA>:/etc/pki/tls\
+sudo scp pruebas.cnf root@<IP_de_CA>:/etc/pki/tls
 ```
 
 Y **EN LA ROCKY CON LA CA** lo firmamos:
@@ -519,17 +527,25 @@ sudo scp pruebas.crt root@<IP_maquina>:~
 sudo a2enmod ssl
 ```
 
-Y ponemos lo siguiente en **/rtc/apache2/sites-availible/000-default.conf** :
+Creamos un directoria para la pagina:
+```bash
+ mkdir /projects/
+ mkdir /projects/pruebas
+ vim /projects/pruebas/index.html # meter algun texto para reconocerlo
+```
+
+Y ponemos lo siguiente en **/etc/apache2/sites-availible/000-default.conf** :
 ```apache
 <VirtualHost *:80>
     ServerName www.pruebas.com
+    ServerAlias pruebas.com www.pruebas.net pruebas.net
+    Redirect / https://www.pruebas.com/
 </VirtualHost>
 
 <VirtualHost *:443>
     ServerName www.pruebas.com
     ServerAlias pruebas.com www.pruebas.net pruebas.net
 
-    # crear si no existe 
     DocumentRoot /projects/pruebas 
 
     SSLEngine on
@@ -537,7 +553,6 @@ Y ponemos lo siguiente en **/rtc/apache2/sites-availible/000-default.conf** :
     SSLCertificateKeyFile /root/pruebas.key
     SSLCertificateChainFile /root/pruebas.csr
 
-    # crear si no existe
     <Directory /projects/pruebas>
         DirectoryIndex index.html
         AllowOverride All
@@ -558,4 +573,84 @@ Y modificamos el archivo hosts de windows **(c:/windows/system32/drivers/etc/hos
 ```
 >Ahora al intentar entrar a estos dominios tendriamos que ver que HTTPS funciona y que ha sido firmado por nuestra CA
 
+---
+---
+
+## 9. Division de dominios COM y NET (en la Ubuntu)
+
+Creamos directorios com y net:
+```bash
+mkdir /projects/pruebas/com
+mkdir /projects/pruebas/net
+vim /projects/pruebas/com/index.html # meter algun texto para reconocerlo
+vim /projects/pruebas/net/index.html # meter algun texto para reconocerlo
+```
+
+
+Editamos el archivo **/etc/apache2/sites-availible/000-default.conf** :
+```apache
+### .COM ###
+
+<VirtualHost *:80>
+    ServerName www.pruebas.com
+    ServerAlias prueabs.com
+    Redirect / https://www.pruebas.com/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.pruebas.com
+    ServerAlias pruebas.com
+
+    DocumentRoot /projects/pruebas/com
+
+    SSLEngine on
+    SSLCertificateFile /root/pruebas.crt
+    SSLCertificateKeyFile /root/pruebas.key
+    SSLCertificateChainFile /root/pruebas.csr
+
+    <Directory /projects/pruebas/com>
+        DirectoryIndex index.html
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+</VirtualHost>
+
+### .NET ###
+
+<VirtualHost *:80>
+    ServerName www.pruebas.net
+    ServerAlias prueabs.net
+    Redirect / https://www.pruebas.net/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.pruebas.com
+    ServerAlias pruebas.com www.pruebas.net pruebas.net
+
+    DocumentRoot /projects/pruebas/net
+
+    SSLEngine on
+    SSLCertificateFile /root/pruebas.crt
+    SSLCertificateKeyFile /root/pruebas.key
+    SSLCertificateChainFile /root/pruebas.csr
+
+    <Directory /projects/pruebas/net>
+        DirectoryIndex index.html
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+</VirtualHost>
+```
+
+Y reiniciamos apache:
+```bash
+sudo systemctl restart apache2
+```
+
+#### Ahora las paginas deberian seguir siendo accesibles pero en proyectos separados (y firmados por la CA)
+
+---
+---
 
