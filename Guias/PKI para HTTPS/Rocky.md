@@ -285,7 +285,7 @@ Y en Firefox, en certificate manager:
 ![firefox](imgs/firefoxcerts.png)
 
 
-Y modificamos el archivo hosts de windows (c:/windows/system32/drivers/etc/hosts) y metemos lo siguiente:
+Y modificamos el archivo hosts de windows **(c:/windows/system32/drivers/etc/hosts)** y metemos lo siguiente:
 ```txt
 192.168.217.147 www.miservidor.es miservidor.es https://miservidor.es http://miservidor.es
 ```
@@ -303,10 +303,11 @@ Creamos el certificado de Carmen firmado por la CA:
 ```bash
 cd /etc/pki/tls
 sudo openssl req -new -keyout carmen-cabrera-key.pem -out carmen-cabrera-csr.pem -noenc
-```
->Organizational Unit Name (eg, section) [ ]: Contabilidad
 
->Common Name (eg, your name or your server's hostname) [ ]: Carmen Cabrera
+```
+>**Organizational Unit Name (eg, section) [ ]: Contabilidad**
+
+>**Common Name (eg, your name or your server's hostname) [ ]: Carmen Cabrera**
 
 Metemos al final del archivo de openssl.cnf la extension/directiva [ user ]:
 ```conf
@@ -328,7 +329,7 @@ sudo openssl ca -extensions user -in carmen-cabrera-csr.pem -out carmen-cabrera-
 
 Y creamos el archivo carmen-cabrera-crt.p12:
 ```bash
-openssl pkcs12 -export -in carmen-cabrera-crt.pem -inkey carmen-cabrera-key.pem -out carmen-cabrera-crt.p12
+sudo openssl pkcs12 -export -in carmen-cabrera-crt.pem -inkey carmen-cabrera-key.pem -out carmen-cabrera-crt.p12
 
 # Y ponemos una password para la exportacion (la que se usa para el buscador)
 ```
@@ -366,4 +367,195 @@ Y usando ese certificado podremos entrar a la pagina.
 
 ## 6. Acceso a paginas por departamento
 
-### 
+### Queremos tener diferentes directorios del server web que sean accesible dependiendo del departamento (OU).
+
+1. **CONTABILIDAD**: Carmen Cabrera
+2. **MARKETING**: Mario Martinez
+
+Creamos un certificado como antes, para Mario Martinez de Marketing (OU):
+```bash
+cd /etc/pki/tls
+
+# Primero el CSR (Poner el departamento en 'Organizational Unit Name'!!)
+sudo openssl req -new -keyout mario-martinez-key.pem -out mario-martinez-csr.pem -noenc
+
+# Firmado por la CA (pide password de la CA)
+sudo openssl ca -extensions user -in mario-martinez-csr.pem -out mario-martinez-crt.pem -days 730
+
+# Lo pasamos a PKCS12 (ponemos password para el cert)
+sudo openssl pkcs12 -export -in mario-martinez-crt.pem -inkey mario-martinez-key.pem -out mario-martinez-crt.p12
+```
+
+Creamos los diferentes directorios para diferentes departamentos :
+```bash
+mkdir /projects/miservidor/contabilidad
+mkdir /projects/miservidor/marketing
+
+# metemos archivos index.html para cada uno, con algun texto para diferenciar
+vim /projects/miservidor/contabilidad/index.html
+vim /projects/miservidor/marketing/index.html
+```
+
+Metemos lo necesario en el archivo de **/etc/httpd/conf.d/miservidor.conf** :
+```apache
+<VirtualHost *:443>
+        # ...
+        <Location /contabilidad/>
+                SSLRequire ( %{SSL_CLIENT_S_DN_OU} eq "Contabilidad")
+        </Location>
+
+        <Location /marketing/>
+                SSLRequire ( %{SSL_CLIENT_S_DN_OU} eq "Marketing")
+        </Location>
+        # ...
+</VirtualHost>
+```
+>**IMPORTANTE:** Las mayusculas importan cuando se pone el directorio en "Location", si no se pone exactamente como se llama no hace las comprobaciones!!
+
+Y reiniciamos el server:
+```bash
+sudo systemctl restart httpd
+```
+
+>Ahora al intentar acceder a cada pagina nos pide certificado, si no eres del departamento correcto, sale **Forbidden**.
+
+---
+---
+
+## 7. Revocacion de Certificados
+
+Para revocar un certificado hacemos lo siguiente:
+```bash
+# Lo revocamos (pide password de la CA)
+sudo openssl ca -revoke mario-martinez-crt.pem
+
+# Y actualizamos el crl.pem (pide password de la CA)
+sudo openssl ca -gencrl -out crl.pem
+```
+
+Y ponemos lo siguiente en **/etc/httpd/conf.d/miservidor.conf** :
+```apache
+<VirtualHost *:443>
+        # ...
+
+        SSLVerifyClient require
+        # Estas dos lineas
+        SSLCARevocationCheck chain
+        SSLCARevocationFile /etc/pki/tls/crl.pem
+
+        <Location /Contabilidad/>
+                # ...
+</VirtualHost>
+```
+>**IMPORTANTE:** Tiene que estar despues de 'SSLVerifyClient require'!!
+
+Y reiniciamos apache:
+```bash
+sudo systemctl restart httpd
+```
+
+#### Ahora al intentar usar ese certificado no dejara
+
+## 8. Firmar certificados de otros servidores
+
+### En la maquina Ubuntu que tenemos 
+
+La maquina tiene los siguientes dominios:
+- www.pruebas.com
+- pruebas.com
+- www.pruebas.net
+- pruebas.net
+
+Primero creamos una clave y CSR (donde sea, yo lo hice en ~) :
+```bash
+sudo openssl genrsa -out pruebas.key 2048
+```
+
+Creamos un archivo SAN 'pruebas.cnf':
+```conf
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+
+[req_distinguished_name]
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = pruebas.com
+DNS.2 = www.pruebas.com
+DNS.3 = pruebas.net
+DNS.4 = www.pruebas.net
+```
+
+Y creamos el CSR con el **CN = pruebas.com** :
+```bash
+sudo openssl req -new -key pruebas.key -out pruebas.csr -config pruebas.cnf -subj "/CN=pruebas.com"
+
+# tendriamos que tener: pruebas.csr, pruebas.key y pruebas.cnf
+```
+
+Copiamos los archivos pruebas.csr y pruebas.cnf a la maquina Rocky con la CA:
+```bash
+sudo scp pruebas.csr root@<IP_de_CA>:/etc/pki/tls
+sudo scp pruebas.cnf root@<IP_de_CA>:/etc/pki/tls\
+```
+
+Y **EN LA ROCKY CON LA CA** lo firmamos:
+```bash
+cd /etc/pki/tls
+
+sudo openssl x509 -req -in pruebas.csr -CA cacert.pem -CAkey private/cakey.pem -CAcreateserial -out pruebas.crt -days 365 -sha256 -extfile pruebas.cnf -extensions v3_req
+```
+
+Y enviamos el certificado (pruebas.crt) a la Ubuntu:
+```bash
+sudo scp pruebas.crt root@<IP_maquina>:~
+```
+
+**Dentro de la Ubuntu** activamos SSL:
+```bash
+sudo a2enmod ssl
+```
+
+Y ponemos lo siguiente en **/rtc/apache2/sites-availible/000-default.conf** :
+```apache
+<VirtualHost *:80>
+    ServerName www.pruebas.com
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.pruebas.com
+    ServerAlias pruebas.com www.pruebas.net pruebas.net
+
+    # crear si no existe 
+    DocumentRoot /projects/pruebas 
+
+    SSLEngine on
+    SSLCertificateFile /root/pruebas.crt
+    SSLCertificateKeyFile /root/pruebas.key
+    SSLCertificateChainFile /root/pruebas.csr
+
+    # crear si no existe
+    <Directory /projects/pruebas>
+        DirectoryIndex index.html
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+</VirtualHost>
+```
+
+Y reiniciamos apache:
+```bash
+sudo systemctl restart apache2
+```
+
+Y modificamos el archivo hosts de windows **(c:/windows/system32/drivers/etc/hosts)** y metemos lo siguiente:
+```txt
+192.168.217.148 www.pruebas.com pruebas.com www.pruebas.net pruebas.net
+```
+>Ahora al intentar entrar a estos dominios tendriamos que ver que HTTPS funciona y que ha sido firmado por nuestra CA
+
+
