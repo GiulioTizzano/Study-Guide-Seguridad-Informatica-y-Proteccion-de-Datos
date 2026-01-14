@@ -625,8 +625,8 @@ Editamos el archivo **/etc/apache2/sites-availible/000-default.conf** :
 </VirtualHost>
 
 <VirtualHost *:443>
-    ServerName www.pruebas.com
-    ServerAlias pruebas.com www.pruebas.net pruebas.net
+    ServerName www.pruebas.net
+    ServerAlias pruebas.net
 
     DocumentRoot /projects/pruebas/net
 
@@ -654,3 +654,97 @@ sudo systemctl restart apache2
 ---
 ---
 
+## 10. WILDCARDS 
+
+### Queremos un certificado wildcard para *.miempresa.es y poner otro VirtualServer 'proyecto1.miempresa.es' usando el nuevo certificado wildcard.
+
+Creamos un nuevo archivo SAN "**san_miempresa.cnf**" en la ROCKY (/etc/pki/tls/san_miempresa.cnf):
+```conf
+[ server_SAN ]
+basicConstraints = CA:FALSE
+ketUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = *.miempresa.es
+DNS.2 = miempresa.es
+```
+
+**En la UBUNTU** creamos la clave y el CSR:
+```bash
+sudo openssl genrsa -out miempresa-key.pem 2048
+
+# Meter los datos con cuidado
+# En CN -> *.miempresa.es
+sudo openssl req -new -key miempresa-key.pem -out miempresa-csr.pem
+```
+
+Le pasamos el CSR a la Rocky:
+```bash
+sudo scp miempresa-csr.pem root@<IP_de_CA>:/etc/pki/tls
+```
+
+Y en la ROCKY firmamos:
+```bash
+cd /etc/pki/tls
+
+# pide password de la CA
+sudo openssl ca -extensions server_SAN -extfile san_miempresa.cnf -in miempresa-csr.pem -out miempresa-crt.pem -days 825
+```
+
+Y de la Rocky -> Ubuntu pasamos el certificado y la CA:
+```bash
+sudo scp miempresa-crt.pem root@<IP_Ubuntu>:~
+sudo scp cacert.pem root@<IP_Ubuntu>:~
+```
+
+En la **Ubuntu** creamos los directorios y contenido necesario:
+```bash
+mkdir /projects/miempresa
+vim /projects/miempresa/index.html # meter algo reconocible
+```
+
+Y creamos el archivo de VirtualServer (/etc/apache2/sites-availible/miempresa.conf):
+```bash
+vim /etc/apache2/sites-availible/miempresa.conf
+```
+```apache
+<VirtualHost *:80>
+    ServerName proyecto1.miempresa.es
+    ServerAlias miempresa.es
+    Redirect permanent / https://proyecto1.miempresa.es/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName proyecto1.miempresa.es
+    ServerAlias miempresa.es
+
+    DocumentRoot /projects/miempresa
+
+    SSLEngine on
+    SSLCertificateFile /root/miempresa-crt.pem
+    SSLCertificateKeyFile /root/miempresa-key.pem
+    SSLCACertificateFile /root/cacert.pem
+
+    <Directory /projects/pruebas/net>
+        DirectoryIndex index.html
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+</VirtualHost>
+```
+
+Activamos la config y reiniciamos apache:
+```bash
+sudo a2ensite miempresa.conf
+sudo systemctl restart apache2
+```
+
+En Windows (c:/windows/system32/drivers/etc/hosts) metemos:
+```txt
+192.168.217.148 proyecto1.miempresa.es miempresa.es
+```
+
+#### Y debemos poder acceder a proyecto1.miempresa.es y miempresa.es en el buscador
