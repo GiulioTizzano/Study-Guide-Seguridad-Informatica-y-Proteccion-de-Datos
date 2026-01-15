@@ -91,4 +91,4 @@ nmap 192.168.1.1 --min-rate 1000
 ```
 
 
-## LINK DEL CHAVAL ESE CON MAS COSAS: https://github.com/Jmartinezc-rgb/CIBER/blob/main/PKI_gu%C3%ADa.md 
+## LINK DEL CHAVAL ESE CON MAS COSAS: https://github.com/Jmartinezc-rgb/CIBER/blob/main/
